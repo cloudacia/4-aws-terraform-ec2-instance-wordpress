@@ -1,5 +1,4 @@
 ---
-#php_modules: [ 'php', 'php-mysql', 'php-fpm', 'php-gd']
 php_modules: [ 'php74-php',
                'php74-php-fpm',
                'php74-php-gd',
