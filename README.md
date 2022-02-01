@@ -1,4 +1,4 @@
-# AWS instance + Wordpress + CentOS + Terraform + Ansible
+# AWS Single EC2 instance + Wordpress + CentOS + Terraform + Ansible
 
 This project aims to deploy Wordpress on an EC2 instances using Terraform and Ansible
 
