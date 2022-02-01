@@ -56,7 +56,7 @@ Deploy the code in your AWS account with Terraform
 |-- variables.tf            # Variables
 |-- output.tf               # Output values
 |-- ansible                 # Ansible playbook
-|-- diagram01.jpeg             # AWS network layout
+|-- diagram01.jpeg          # AWS network layout
 |-- LICENSE.txt
 |-- README.md
 ```
