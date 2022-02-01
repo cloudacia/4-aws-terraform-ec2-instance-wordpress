@@ -1,0 +1,128 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: yes
+  vars_files:
+    - vars/default.yml
+  tasks:
+  # Apache configuration
+  - name: Installs Apache Web Server
+    yum:
+      name: httpd
+      state: latest
+  - name: Enables httpd service to start on boot up
+    service:
+      name: httpd
+      state: started
+  - name: Installs MariaDb server
+    yum:
+      name: mariadb-server
+      state: present
+  - name: Enables mariadb service to start on boot up
+    service:
+      name: mariadb
+      state: started
+      enabled: true
+  # Python support libraries
+  - name: Installs Python MySQL support libraries
+    yum:
+      name: MySQL-python
+      state: latest
+  # MySQL Configuration
+  - name: Sets the root password
+    mysql_user:
+      name: root
+      password: "{{ mysql_root_password }}"
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+      check_implicit_admin: yes
+      priv: "*.*:ALL,GRANT"
+  - name: Removes user test from MariaDB
+    mysql_db:
+      name: test
+      state: absent
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+  - name: Removes all anonymous user accounts from MariaDB
+    mysql_user:
+      name: ''
+      host_all: yes
+      state: absent
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+  - name: Removes the MySQL test database
+    mysql_db:
+      name: test
+      state: absent
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+  - name: Creates wordpress user account Mariadb
+    mysql_user:
+      name: 'wordpress'
+      password: 'wordpress1234'
+      priv: '*.*:ALL,GRANT'
+      host: '%localhost'
+      state: present
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+  - name: Create a new database with name 'wordpress'
+    community.mysql.mysql_db:
+      name: wordpress
+      state: present
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+  # PHP installaton
+  - name: Install Remi Repository
+    yum:
+      name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+      state: present
+  - name: Installs PHP packages and libraries
+    yum:
+      name:  "{{ item }}"
+      state: present
+    loop: "{{ php_modules }}"
+  - name: Create a symbolic link
+    ansible.builtin.file:
+      src: /usr/bin/php74
+      dest: /usr/bin/php
+      owner: root
+      group: root
+      state: link
+      force: yes
+  - name: Copy file with info.php
+    ansible.builtin.copy:
+      src: files/info.php
+      dest: /var/www/html/
+      owner: apache
+      group: apache
+      mode: '0644'
+  # Wordpress installation
+  - name: Download Wordpress latest version
+    get_url:
+      url: http://wordpress.org/latest.tar.gz
+      dest: /var/www/html/wordpress.tar.gz
+      mode: '0440'
+  - name: Extract wordpress.tar.gz into /var/www/html
+    ansible.builtin.unarchive:
+      src: /var/www/html/wordpress.tar.gz
+      dest: /var/www/html/
+      owner: apache
+      group: apache
+      remote_src: yes
+  - name: Write the Wordpress configuration file
+    template:
+      src: templates/wp-config.php.j2
+      dest: /var/www/html/wordpress/wp-config.php
+    notify:
+      - Restart apache service
+  - name: Write the Apache configuration file
+    template:
+      src: templates/httpd.conf.j2
+      dest: /etc/httpd/conf/httpd.conf
+    notify:
+    - Restart apache service
+  handlers:
+  - name: Restart apache service
+    service:
+      name: httpd
+      state: restarted
