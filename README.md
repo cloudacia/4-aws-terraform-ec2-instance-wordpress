@@ -1,6 +1,6 @@
 # AWS Single EC2 instance + Wordpress + CentOS + Terraform + Ansible
 
-This project aims to deploy Wordpress on an EC2 instances using Terraform and Ansible
+This project aims to deploy Wordpress on an EC2 instance using Terraform and Ansible Playbook.
 
 **Built with**
 
@@ -56,15 +56,14 @@ Deploy the code in your AWS account with Terraform
 |-- variables.tf            # Variables
 |-- output.tf               # Output values
 |-- ansible                 # Ansible playbook
-|-- /app                    # Simple Python web app
-|-- diagram.png             # AWS network layout
+|-- diagram01.jpeg             # AWS network layout
 |-- LICENSE.txt
 |-- README.md
 ```
 
 **Architecture**
 
-![Screenshot](diagram02.png)
+![Screenshot](diagram01.jpeg)
 
 **Contributing**
 
