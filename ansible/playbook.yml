@@ -5,8 +5,14 @@
   vars_files:
     - vars/default.yml
   tasks:
-  # Apache configuration
-  - name: Installs Apache Web Server
+
+  ##################################################
+  #                                                #
+  #   Apache Web Server installation               #
+  #                                                #
+  ##################################################
+
+  - name: Install Apache Web Server
     yum:
       name: httpd
       state: latest
@@ -14,113 +20,175 @@
     service:
       name: httpd
       state: started
-  - name: Installs MariaDb server
+
+ ##################################################
+ #                                                #
+ #   MariaDB database installation                #
+ #                                                #
+ ##################################################
+
+  - name: Install MariaDb server
     yum:
       name: mariadb-server
       state: present
-  - name: Enables mariadb service to start on boot up
+  - name: Enable mariadb service to start on boot up
     service:
       name: mariadb
       state: started
       enabled: true
-  # Python support libraries
-  - name: Installs Python MySQL support libraries
+
+  ##################################################
+  #                                                #
+  #   Python MySQL libraries installation need by  #
+  #   Ansible                                      #
+  ##################################################
+
+  - name: Install Python MySQL support libraries
     yum:
       name: MySQL-python
       state: latest
-  # MySQL Configuration
-  - name: Sets the root password
+  ##################################################
+  #                                                #
+  #   MySQL database configuration                 #
+  #                                                #
+  ##################################################
+
+  - name: Set the root password
     mysql_user:
       name: root
       password: "{{ mysql_root_password }}"
-      login_user: root
+      login_user: "{{ mysql_login_user }}"
       login_password: "{{ mysql_root_password }}"
       check_implicit_admin: yes
-      priv: "*.*:ALL,GRANT"
-  - name: Removes user test from MariaDB
+      priv: "{{ mysql_wp_user_privileges }}"
+  - name: Remove user test from MariaDB
     mysql_db:
       name: test
       state: absent
-      login_user: root
+      login_user: "{{ mysql_login_user }}"
       login_password: "{{ mysql_root_password }}"
-  - name: Removes all anonymous user accounts from MariaDB
+  - name: Remove all anonymous user accounts from MariaDB
     mysql_user:
       name: ''
       host_all: yes
       state: absent
-      login_user: root
+      login_user: "{{ mysql_login_user }}"
       login_password: "{{ mysql_root_password }}"
-  - name: Removes the MySQL test database
+  - name: Remove the MySQL test database
     mysql_db:
       name: test
       state: absent
-      login_user: root
+      login_user: "{{ mysql_login_user }}"
       login_password: "{{ mysql_root_password }}"
-  - name: Creates wordpress user account Mariadb
+  - name: Create wordpress user account Mariadb
     mysql_user:
-      name: 'wordpress'
-      password: 'wordpress1234'
-      priv: '*.*:ALL,GRANT'
+      name: "{{ mysql_wp_db_user }}"
+      password: "{{ mysql_wp_db_password }}"
+      priv: "{{ mysql_wp_user_privileges }}"
       host: '%localhost'
       state: present
-      login_user: root
+      login_user: "{{ mysql_login_user }}"
       login_password: "{{ mysql_root_password }}"
   - name: Create a new database with name 'wordpress'
     community.mysql.mysql_db:
-      name: wordpress
+      name: "{{ mysql_wp_db_name }}"
       state: present
-      login_user: root
+      login_user: "{{ mysql_login_user }}"
       login_password: "{{ mysql_root_password }}"
-  # PHP installaton
+
+  ##################################################
+  #                                                #
+  #   PHP 7.4 nstallation                          #
+  #                                                #
+  ##################################################
+
   - name: Install Remi Repository
     yum:
-      name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+      name: "{{ php_remi_repo }}"
       state: present
-  - name: Installs PHP packages and libraries
+  - name: Install PHP packages and libraries
     yum:
       name:  "{{ item }}"
       state: present
     loop: "{{ php_modules }}"
   - name: Create a symbolic link
-    ansible.builtin.file:
-      src: /usr/bin/php74
-      dest: /usr/bin/php
+    file:
+      src: "{{ php_src }}"
+      dest: "{{ php_dest }}"
       owner: root
       group: root
       state: link
       force: yes
-  - name: Copy file with info.php
-    ansible.builtin.copy:
-      src: files/info.php
-      dest: /var/www/html/
-      owner: apache
-      group: apache
-      mode: '0644'
-  # Wordpress installation
+
+  ##################################################
+  #                                                #
+  #   Wordpress installation                       #
+  #                                                #
+  ##################################################
+
   - name: Download Wordpress latest version
     get_url:
-      url: http://wordpress.org/latest.tar.gz
-      dest: /var/www/html/wordpress.tar.gz
-      mode: '0440'
+      url: "{{ wp_url_site }}"
+      dest: "{{ wp_dest_path }}"
+      mode: "{{ wp_dir_mode }}"
   - name: Extract wordpress.tar.gz into /var/www/html
-    ansible.builtin.unarchive:
-      src: /var/www/html/wordpress.tar.gz
-      dest: /var/www/html/
-      owner: apache
-      group: apache
+    unarchive:
+      src: "{{ wp_file_src }}"
+      dest: "{{ wp_file_dest }}"
+      owner: "{{ wp_dir_owner }}"
+      group: "{{ wp_dir_group }}"
       remote_src: yes
   - name: Write the Wordpress configuration file
     template:
-      src: templates/wp-config.php.j2
-      dest: /var/www/html/wordpress/wp-config.php
+      src: "{{ wp_conf_template_file_src }}"
+      dest: "{{ wp_conf_template_file_dest }}"
     notify:
       - Restart apache service
   - name: Write the Apache configuration file
     template:
-      src: templates/httpd.conf.j2
-      dest: /etc/httpd/conf/httpd.conf
+      src: "{{ apache_conf_template_file_src }}"
+      dest: "{{ apache_conf_template_file_dest }}"
     notify:
     - Restart apache service
+  - name: Flush handlers
+    meta: flush_handlers
+
+##################################################
+#                                                #
+#   Wordpress CLI installation                   #
+#                                                #
+##################################################
+
+  - name: Downlading WP CLI
+    shell:
+      chdir: "{{ working_dir }}"
+      cmd: curl -O "{{ wp_cli_url }}"
+  - name: Making wp-cli.phar executable
+    shell:
+      chdir: "{{ working_dir }}"
+      cmd: chmod +x wp-cli.phar
+  - name: Moving wp-cli.phar to "{{ wp_cli_bin_path }}"
+    shell:
+      chdir: "{{ working_dir }}"
+      cmd: sudo mv wp-cli.phar "{{ wp_cli_bin_path }}"
+
+  ##################################################
+  #                                                #
+  #   Wordpress CLI settings                       #
+  #                                                #
+  ##################################################
+
+  - name: Setting up Wordpress
+    shell:
+      chdir: "{{ working_dir }}"
+      cmd: /usr/local/bin/wp core install --url="{{ wp_url }}" --title="{{ wp_title }}" --admin_user="{{ wp_admin_user }}" --admin_password="{{ wp_admin_password }}" --admin_email="{{ wp_admin_email }}"
+    
+  ##################################################
+  #                                                #
+  #   Ansible handlers                             #
+  #                                                #
+  ##################################################
+
   handlers:
   - name: Restart apache service
     service:

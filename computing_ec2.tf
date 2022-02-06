@@ -18,7 +18,7 @@ resource "aws_instance" "web01" {
   }
 
   provisioner "local-exec" {
-    command     = "sleep 120; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u centos -i '${self.public_ip},' playbook.yml"
+    command     = "sleep 120; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u centos -i '${self.public_ip},' --extra-var 'wp_url=${self.public_dns}' playbook.yml"
     working_dir = "ansible"
   }
 }
